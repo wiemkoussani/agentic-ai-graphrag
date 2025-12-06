@@ -1,0 +1,288 @@
+# System Architecture Diagrams
+
+## Agent Workflow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        USER QUERY                            │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    FASTAPI BACKEND                           │
+│                    POST /ask                                 │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  LANGGRAPH WORKFLOW                          │
+│                                                              │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │              AGENT NODE (LLM)                       │    │
+│  │  - Analyze query                                    │    │
+│  │  - Select appropriate tools                         │    │
+│  │  - Generate tool calls                              │    │
+│  └───────────────────┬──────────────────────────────────┘    │
+│                      │                                        │
+│                      ▼                                        │
+│          ┌───────────────────────┐                           │
+│          │  Should Continue?     │                           │
+│          └───────┬───────┬───────┘                           │
+│                  │       │                                   │
+│            ┌─────┘       └─────┐                             │
+│            │                   │                             │
+│            ▼                   ▼                             │
+│    ┌──────────────┐    ┌──────────────┐                     │
+│    │   TOOLS      │    │      END      │                     │
+│    │   NODE       │    │               │                     │
+│    └──────┬───────┘    └───────────────┘                     │
+│           │                                                   │
+│           ▼                                                   │
+│    ┌──────────────────────────────────┐                     │
+│    │  Tool Execution:                 │                     │
+│    │  - graph_query                   │                     │
+│    │  - calculator                    │                     │
+│    │  - web_search                    │                     │
+│    └──────┬───────────────────────────┘                     │
+│           │                                                   │
+│           └───────────────────┐                              │
+│                               │                              │
+│                               ▼                              │
+│                    ┌──────────────────┐                      │
+│                    │   AGENT NODE     │                      │
+│                    │   (Synthesize)   │                      │
+│                    └────────┬─────────┘                      │
+│                             │                                │
+│                             ▼                                │
+│                    ┌──────────────────┐                      │
+│                    │  FINAL RESPONSE  │                      │
+│                    └──────────────────┘                      │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    JSON RESPONSE                             │
+│  {                                                           │
+│    "response": "...",                                        │
+│    "tools_used": [...],                                      │
+│    "steps": [...]                                            │
+│  }                                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## GraphRAG Pipeline Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      USER QUERY                              │
+│              "Who acted in Inception?"                     │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  GRAPHRAG PIPELINE                           │
+│                                                              │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │          1. QUERY EMBEDDING                        │    │
+│  │  SentenceTransformer: all-MiniLM-L6-v2             │    │
+│  │  Output: 384-dim vector                            │    │
+│  └───────────────────┬────────────────────────────────┘    │
+│                      │                                        │
+│          ┌───────────┴───────────┐                          │
+│          │                       │                          │
+│          ▼                       ▼                          │
+│  ┌──────────────┐      ┌──────────────────┐               │
+│  │   VECTOR      │      │   GRAPH          │               │
+│  │   SEARCH      │      │   TRAVERSAL      │               │
+│  │               │      │                  │               │
+│  │ - Cosine      │      │ - Pattern match  │               │
+│  │   similarity  │      │ - Cypher query   │               │
+│  │ - Top-k nodes │      │ - Multi-hop      │               │
+│  └───────┬───────┘      └────────┬─────────┘               │
+│          │                       │                          │
+│          └───────────┬───────────┘                          │
+│                      │                                        │
+│                      ▼                                        │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │          2. COMBINE & DEDUPLICATE                  │    │
+│  │  - Merge vector and traversal results              │    │
+│  │  - Remove duplicate nodes                          │    │
+│  │  - Rank by relevance                               │    │
+│  └───────────────────┬────────────────────────────────┘    │
+│                      │                                        │
+│                      ▼                                        │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │          3. BUILD CONTEXT                          │    │
+│  │  Format:                                          │    │
+│  │  Actor: Leonardo DiCaprio                         │    │
+│  │    - nationality: American                        │    │
+│  │    - born: 1974                                   │    │
+│  │  Film: Inception                                  │    │
+│  │    - year: 2010                                   │    │
+│  │    - rating: 8.8                                  │    │
+│  │    - duration: 148                                │    │
+│  └───────────────────┬────────────────────────────────┘    │
+│                      │                                        │
+│                      ▼                                        │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │          4. RETURN TO AGENT                       │    │
+│  │  Context text + metadata                          │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Knowledge Graph Schema
+
+```
+                    ┌─────────────┐
+                    │    Actor    │
+                    │             │
+                    │ - id        │
+                    │ - name      │
+                    │ - nationality│
+                    │ - born      │
+                    │ - embedding │
+                    └──────┬──────┘
+                           │
+            ┌──────────────┼──────────────┐
+            │              │              │
+            │              │              │
+    ┌───────▼──────┐  ┌───▼────┐  ┌──────▼──────┐
+    │  JOUE_DANS   │  │A_JOUÉ_ │  │  JOUE_DANS   │
+    │  (Film)      │  │AVEC    │  │  (Serie)     │
+    └───────┬──────┘  └───┬────┘  └──────┬──────┘
+            │              │              │
+            │              │              │
+    ┌───────▼──────┐       │      ┌───────▼──────┐
+    │    Film      │       │      │    Serie     │
+    │              │       │      │              │
+    │ - id         │       │      │ - id         │
+    │ - name       │       │      │ - name       │
+    │ - year       │       │      │ - seasons    │
+    │ - duration   │       │      │ - episodes   │
+    │ - rating     │       │      │ - rating     │
+    │ - embedding  │       │      │ - embedding  │
+    └──────┬───────┘       │      └──────┬───────┘
+           │               │             │
+    ┌──────┼───────────────┘             │
+    │      │                              │
+    │      │                              │
+┌───▼──────▼──────┐              ┌───────▼──────┐
+│   REALISE       │              │  REALISE     │
+│  (Director)     │              │  (Director) │
+└────────┬────────┘              └──────┬───────┘
+         │                              │
+         │                              │
+┌────────▼────────┐            ┌────────▼────────┐
+│   Director      │            │   Director      │
+│                 │            │                 │
+│ - id            │            │ - id            │
+│ - name          │            │ - name          │
+│ - nationality   │            │ - nationality   │
+│ - born          │            │ - born          │
+│ - embedding     │            │ - embedding     │
+└─────────────────┘            └─────────────────┘
+
+         ┌─────────────┐
+         │    Film     │
+         │   / Serie   │
+         └──────┬──────┘
+                │
+         ┌──────▼──────┐
+         │APPARTIENT_A │
+         │_GENRE       │
+         └──────┬──────┘
+                │
+         ┌──────▼──────┐
+         │    Genre    │
+         │             │
+         │ - id        │
+         │ - name      │
+         │ - embedding │
+         └─────────────┘
+```
+
+## System Component Interaction
+
+```
+┌──────────────┐
+│   Browser    │
+│  (Frontend)  │
+└──────┬───────┘
+       │ HTTP
+       │
+┌──────▼──────────────────┐
+│   FastAPI Server        │
+│   (Port 8000)           │
+│                         │
+│  ┌──────────────────┐  │
+│  │  /ask endpoint   │  │
+│  └────────┬─────────┘  │
+│           │             │
+│           ▼             │
+│  ┌──────────────────┐  │
+│  │  AgenticAI       │  │
+│  │  (LangGraph)     │  │
+│  └────────┬─────────┘  │
+│           │             │
+│    ┌──────┴──────┐      │
+│    │             │      │
+│    ▼             ▼      │
+│  ┌──────┐    ┌────────┐│
+│  │Tools │    │GraphRAG││
+│  └──┬───┘    └───┬────┘│
+│     │            │     │
+└─────┼────────────┼─────┘
+      │            │
+      │            │
+┌─────▼────────────▼─────┐
+│   Neo4j Database      │
+│   (Port 7687)         │
+│                       │
+│  - Nodes              │
+│  - Relationships      │
+│  - Embeddings         │
+└───────────────────────┘
+```
+
+## Tool Selection Logic
+
+```
+Query Analysis
+    │
+    ├─ Contains "calculate", "math", numbers?
+    │  └─> Use Calculator Tool
+    │
+    ├─ Contains "search", "current", "news"?
+    │  └─> Use Web Search Tool
+    │
+    ├─ Contains person/company/technology names?
+    │  └─> Use Graph Query Tool
+    │
+    └─ Multiple intents?
+       └─> Use Multiple Tools Sequentially
+```
+
+## Data Flow Example
+
+```
+User: "Who acted in Inception and who directed it?"
+
+1. Streamlit UI → User submits query
+2. Streamlit → Agent.query() (direct call)
+3. Agent Node → Groq LLM analyzes query
+4. Agent → Selects graph_query tool
+5. Graph Query Tool → GraphRAG.hybrid_retrieval()
+6. GraphRAG → Vector search for "Inception"
+7. GraphRAG → Traversal: (Actor)-[:JOUE_DANS]->(Film)
+8. GraphRAG → Traversal: (Director)-[:REALISE]->(Film)
+9. GraphRAG → Combines results, builds context
+10. Tool → Returns context to agent
+11. Agent Node → Synthesizes response with Groq LLM
+12. Agent → Returns final answer
+13. Streamlit → Updates UI with response
+14. Message stored in session state
+```
+
+
+

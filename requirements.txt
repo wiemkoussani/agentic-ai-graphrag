@@ -1,0 +1,26 @@
+# Core dependencies
+langchain==0.1.0
+langchain-groq==0.1.0
+langgraph==0.0.20
+langchain-community==0.0.20
+neo4j==5.15.0
+
+# Streamlit for UI
+streamlit==1.31.0
+streamlit-chat==0.1.1
+
+# FastAPI and web (optional, for API mode)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+pydantic==2.5.3
+
+# Vector store and embeddings
+sentence-transformers==2.3.1
+numpy>=1.26.0,<2.0.0
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+aiohttp==3.9.1
+
