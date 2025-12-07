@@ -264,7 +264,7 @@ def main():
         label_visibility="collapsed"
     )
     
-    col1, col2 = st.columns([1, 10])
+    col1, col2 = st.columns([2, 10])
     with col1:
         send_button = st.button("🚀 Send", type="primary", use_container_width=True)
     

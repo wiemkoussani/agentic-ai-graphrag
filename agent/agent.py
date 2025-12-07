@@ -19,7 +19,7 @@ class AgentState(TypedDict):
 class AgenticAI:
     """Main agentic AI system using LangGraph."""
     
-    def __init__(self, graphrag: GraphRAGPipeline, model_name: str = "llama-3.1-70b-versatile"):
+    def __init__(self, graphrag: GraphRAGPipeline, model_name: str = "llama-3.3-70b-versatile"):
         self.graphrag = graphrag
         self.llm = ChatGroq(model=model_name, temperature=0)
         self.tools = get_tools(graphrag)
